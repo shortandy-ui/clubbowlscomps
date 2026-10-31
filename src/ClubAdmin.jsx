@@ -58,7 +58,7 @@ export default function ClubAdmin({ config, comps, onSaveConfig, onNewSeason, on
         </select>
       </label>
 
-      <div style={{ ...styles.fieldLabel, marginTop: 14 }}>Competition names</div>
+      <div style={{ ...styles.fieldLabel, marginTop: 14 }}>Competition names — type over "Competition 1" etc. with your own names, then click Save competitions</div>
       <div style={styles.nameGrid}>
         {names.map((n, i) => (
           <input

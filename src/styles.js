@@ -321,3 +321,14 @@ Object.assign(styles, {
   nameGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8, marginTop: 6 },
   clubRow: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "10px 0", borderBottom: "1px solid #f2ead4" },
 });
+
+Object.assign(styles, {
+  bulkBox: { marginTop: 10, background: "#F9F5E8", border: "1px solid #E4D9B8", borderRadius: 8, padding: 12 },
+  bulkPreview: { display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10, maxHeight: 130, overflowY: "auto" },
+  chip: { background: "#FDFBF6", border: "1px solid #e2d9c2", borderRadius: 14, padding: "3px 10px", fontSize: 12 },
+});
+
+Object.assign(styles, {
+  joinBox: { marginTop: 10, background: "#FDFBF6", border: "1px solid #E4CF8C", borderRadius: 6, padding: "8px 10px" },
+  radioRow: { display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13, padding: "3px 0", cursor: "pointer" },
+});

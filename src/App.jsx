@@ -277,6 +277,11 @@ export default function App() {
         isAdmin={isClubAdmin}
         onSave={(next) => saveComp(comp.id, next)}
         onBack={() => go(`#/c/${route.club}`)}
+        onRename={(newName) =>
+          saveConfig({
+            comps: clubData.config.comps.map((c) => (c.id === comp.id ? { ...c, name: newName } : c)),
+          })
+        }
       />
     ) : (
       <div style={styles.emptyState}>That competition doesn't exist.</div>
