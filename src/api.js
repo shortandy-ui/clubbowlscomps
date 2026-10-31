@@ -76,3 +76,18 @@ export async function setPassword(auth, target, newPassword) {
     return false;
   }
 }
+
+// Backups (master admin): { action: "list" | "run" | "restore", id?, confirm? }
+export async function backupAction(auth, body) {
+  try {
+    const res = await fetch("/api/backup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...body, auth }),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, ...data };
+  } catch {
+    return { ok: false, error: "Can't reach the server." };
+  }
+}

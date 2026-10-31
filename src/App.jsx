@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { getKey, putKey, login, setPassword, clubInfo } from "./api";
+import { getKey, putKey, login, setPassword, clubInfo, backupAction } from "./api";
 import { styles, fontCss } from "./styles";
 import { configKey, compKey, emptyComp, defaultConfig, parseJson } from "./helpers";
 import MasterPanel from "./MasterPanel";
@@ -342,6 +342,7 @@ export default function App() {
         onSetClubPassword={setClubPasswordFor}
         onSetPlayersPassword={setPlayersPasswordFor}
         onChangeMasterPassword={changeMasterPassword}
+        onBackup={(body) => backupAction(auth, body)}
       />
     ) : (
       <LoginCard title="Master admin sign-in" onSubmit={doMasterLogin} onCancel={() => go("#/")} />
