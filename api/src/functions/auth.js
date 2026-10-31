@@ -1,9 +1,10 @@
 const { app } = require("@azure/functions");
-const { verifyAuth, setPassword, wait } = require("../lib/store");
+const { verifyAuth, setPassword, hasPlayersPassword, wait } = require("../lib/store");
 
 // POST /api/auth
 //   { action: "login", auth }
-//   { action: "setPassword", auth, target: { role: "master" } | { role: "club", club }, newPassword }
+//   { action: "setPassword", auth, target: { role: "master" } | { role: "club" | "players", club }, newPassword }
+//   { action: "clubInfo", auth, club }   → { playersPasswordSet }  (that club's admin or master)
 app.http("auth", {
   methods: ["POST"],
   authLevel: "anonymous",
@@ -27,6 +28,14 @@ app.http("auth", {
         return { status: 200, jsonBody: { ok: true, role: who.role } };
       }
 
+      if (action === "clubInfo") {
+        const club = body.club;
+        if (!who || !(who.role === "master" || (who.role === "club" && who.club === club))) {
+          return { status: 401, jsonBody: { error: "not allowed" } };
+        }
+        return { status: 200, jsonBody: { playersPasswordSet: await hasPlayersPassword(club) } };
+      }
+
       if (action === "setPassword") {
         if (!who) {
           await wait(600);
@@ -41,10 +50,11 @@ app.http("auth", {
           await setPassword("master", pw);
           return { status: 200, jsonBody: { ok: true } };
         }
-        if (target && target.role === "club" && /^[a-z0-9-]{1,40}$/.test(target.club || "")) {
+        if (target && (target.role === "club" || target.role === "players") && /^[a-z0-9-]{1,40}$/.test(target.club || "")) {
+          // Only the club's admin or the master admin — players can't change passwords.
           const allowed = who.role === "master" || (who.role === "club" && who.club === target.club);
           if (!allowed) return { status: 401, jsonBody: { error: "not allowed" } };
-          await setPassword("club__" + target.club, pw);
+          await setPassword((target.role === "club" ? "club__" : "players__") + target.club, pw);
           return { status: 200, jsonBody: { ok: true } };
         }
         return { status: 400, jsonBody: { error: "bad target" } };

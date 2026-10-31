@@ -1,12 +1,28 @@
 const { app } = require("@azure/functions");
-const { readText, writeText, verifyAuth } = require("../lib/store");
+const { readText, writeText, verifyAuth, canAccessClub, wait } = require("../lib/store");
 
 // Only these keys can be read or written through the public API.
 //   clubs                        the list of clubs            (master admin writes)
 //   club__<id>__config           a club's competitions setup  (club or master admin writes)
-//   club__<id>__c<n>             one competition's data       (anyone writes: players enter scores)
+//   club__<id>__c<n>             one competition's data       (the club's players write: they enter scores)
+// Everything under club__<id> can only be read or written by that club's
+// players, its admin or the master admin (once the club has a players' password).
 const KEY_OK = /^(clubs|club__[a-z0-9-]{1,40}__(config|c\d{1,3}))$/;
 const MAX_VALUE_LENGTH = 1000000;
+
+// GET requests carry the caller's password in an x-cc-auth header (base64 JSON),
+// POST requests in the body.
+function authFromHeader(request) {
+  const raw = request.headers.get("x-cc-auth");
+  if (!raw) return null;
+  try {
+    return JSON.parse(Buffer.from(raw, "base64").toString("utf-8"));
+  } catch {
+    return null;
+  }
+}
+
+const NEED_PASSWORD = { status: 401, jsonBody: { error: "Enter your club's password.", needPassword: true } };
 
 app.http("kv", {
   methods: ["GET", "POST"],
@@ -17,6 +33,10 @@ app.http("kv", {
       if (request.method === "GET") {
         const key = request.query.get("key") || "";
         if (!KEY_OK.test(key)) return { status: 400, jsonBody: { error: "bad key" } };
+        if (key !== "clubs" && !(await canAccessClub(authFromHeader(request), key.split("__")[1]))) {
+          await wait(300);
+          return NEED_PASSWORD;
+        }
         const value = await readText(key);
         if (value === null) return { status: 404, jsonBody: { error: "not found" } };
         return { status: 200, jsonBody: { key, value } };
@@ -44,6 +64,9 @@ app.http("kv", {
         const who = await verifyAuth(auth);
         const allowed = who && (who.role === "master" || (who.role === "club" && who.club === clubId));
         if (!allowed) return { status: 401, jsonBody: { error: "club admin only" } };
+      } else if (!(await canAccessClub(auth, key.split("__")[1]))) {
+        await wait(300);
+        return NEED_PASSWORD;
       }
 
       await writeText(key, value);
