@@ -2,16 +2,17 @@ const { BlobServiceClient } = require("@azure/storage-blob");
 const crypto = require("crypto");
 
 const CONTAINER_NAME = "club-comps-data";
-let containerPromise = null;
+const containerPromises = {};
 
-function getContainer() {
-  if (!containerPromise) {
+// The site's data lives in "club-comps-data"; backups go in "club-comps-backups".
+function getContainer(name = CONTAINER_NAME) {
+  if (!containerPromises[name]) {
     const cs = process.env.AZURE_STORAGE_CONNECTION_STRING;
     if (!cs) throw new Error("AZURE_STORAGE_CONNECTION_STRING is not configured");
-    const container = BlobServiceClient.fromConnectionString(cs).getContainerClient(CONTAINER_NAME);
-    containerPromise = container.createIfNotExists().then(() => container);
+    const container = BlobServiceClient.fromConnectionString(cs).getContainerClient(name);
+    containerPromises[name] = container.createIfNotExists().then(() => container);
   }
-  return containerPromise;
+  return containerPromises[name];
 }
 
 function blobNameFor(key) {
@@ -111,4 +112,4 @@ async function canAccessClub(auth, club) {
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-module.exports = { readText, writeText, setPassword, verifyAuth, canAccessClub, hasPlayersPassword, wait };
+module.exports = { getContainer, readText, writeText, setPassword, verifyAuth, canAccessClub, hasPlayersPassword, wait };
