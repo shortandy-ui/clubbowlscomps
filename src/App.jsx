@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { getKey, putKey, login, setPassword } from "./api";
+import { getKey, putKey, login, setPassword, clubInfo } from "./api";
 import { styles, fontCss } from "./styles";
 import { configKey, compKey, emptyComp, defaultConfig, parseJson } from "./helpers";
 import MasterPanel from "./MasterPanel";
@@ -22,6 +22,25 @@ function parseHash() {
   return { view: "clubs" };
 }
 
+// Players' passwords this browser remembers, one per club, so players only type
+// theirs once. Browser storage can be unavailable (private windows), so every
+// read and write is guarded.
+const ACCESS_KEY = "cc-player-access";
+function readPlayerAccess() {
+  try {
+    return JSON.parse(localStorage.getItem(ACCESS_KEY) || "{}") || {};
+  } catch {
+    return {};
+  }
+}
+function writePlayerAccess(map) {
+  try {
+    localStorage.setItem(ACCESS_KEY, JSON.stringify(map));
+  } catch {
+    /* not remembered — they'll be asked again next visit */
+  }
+}
+
 function Logo() {
   return (
     <svg width="52" height="52" viewBox="0 0 52 52" aria-hidden="true" style={{ flexShrink: 0 }}>
@@ -33,7 +52,7 @@ function Logo() {
   );
 }
 
-function LoginCard({ title, hint, onSubmit, onCancel }) {
+function LoginCard({ title, hint, onSubmit, onCancel, cancelLabel = "Cancel" }) {
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -65,7 +84,7 @@ function LoginCard({ title, hint, onSubmit, onCancel }) {
           <button style={styles.btnPrimary} onClick={submit} disabled={busy}>
             {busy ? "Checking…" : "Sign in"}
           </button>
-          {onCancel && <button style={styles.btnGhost} onClick={onCancel}>Cancel</button>}
+          {onCancel && <button style={styles.btnGhost} onClick={onCancel}>{cancelLabel}</button>}
         </div>
       </div>
     </div>
@@ -79,8 +98,12 @@ export default function App() {
   const [clubLoading, setClubLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [saveError, setSaveError] = useState("");
-  const [auth, setAuth] = useState(null); // { role, club?, password }
+  const [auth, setAuth] = useState(null); // admin sign-in: { role, club?, password }
   const [showLogin, setShowLogin] = useState(false);
+  // { [clubId]: { role: "player", club, password } } — see readPlayerAccess
+  const [playerAccess, setPlayerAccess] = useState(readPlayerAccess);
+  const [needPassword, setNeedPassword] = useState(false);
+  const [playersPasswordSet, setPlayersPasswordSet] = useState(null);
 
   useEffect(() => {
     const onHash = () => setRoute(parseHash());
@@ -105,10 +128,35 @@ export default function App() {
     })();
   }, []);
 
-  // load a club's setup and competitions whenever the club in the link changes
+  // Which password to send for a club: an admin sign-in for that club (or the
+  // master admin) if there is one, otherwise the players' password remembered here.
+  const accessFor = useCallback(
+    (clubId) =>
+      auth && (auth.role === "master" || auth.club === clubId) ? auth : playerAccess[clubId] || null,
+    [auth, playerAccess]
+  );
+  const access = route.club ? accessFor(route.club) : null;
+  const accessKey = access ? access.role + ":" + access.password : "";
+
+  const rememberPlayerAccess = (clubId, a) =>
+    setPlayerAccess((m) => {
+      const next = { ...m, [clubId]: a };
+      writePlayerAccess(next);
+      return next;
+    });
+  const forgetPlayerAccess = (clubId) =>
+    setPlayerAccess((m) => {
+      const next = { ...m };
+      delete next[clubId];
+      writePlayerAccess(next);
+      return next;
+    });
+
+  // load a club's setup and competitions whenever the club in the link (or the password) changes
   useEffect(() => {
     if (!route.club) {
       setClubData(null);
+      setNeedPassword(false);
       return;
     }
     let cancelled = false;
@@ -116,26 +164,50 @@ export default function App() {
       setClubLoading(true);
       setLoadError("");
       try {
-        const cfg = parseJson(await getKey(configKey(route.club)), null) || defaultConfig();
+        const cfg = parseJson(await getKey(configKey(route.club), access), null) || defaultConfig();
         const entries = await Promise.all(
           cfg.comps.map(async (c) => [
             c.id,
-            parseJson(await getKey(compKey(route.club, c.id)), null) || emptyComp(),
+            parseJson(await getKey(compKey(route.club, c.id), access), null) || emptyComp(),
           ])
         );
-        if (!cancelled) setClubData({ id: route.club, config: cfg, comps: Object.fromEntries(entries) });
+        if (!cancelled) {
+          setNeedPassword(false);
+          setClubData({ id: route.club, config: cfg, comps: Object.fromEntries(entries) });
+        }
       } catch (e) {
-        if (!cancelled) setLoadError("Could not load this club. Please refresh the page.");
+        if (cancelled) return;
+        if (e.needPassword) {
+          setClubData(null);
+          setNeedPassword(true);
+          // A remembered password that no longer works (the admin changed it) is forgotten.
+          if (access && access.role === "player") forgetPlayerAccess(route.club);
+        } else {
+          setLoadError("Could not load this club. Please refresh the page.");
+        }
       } finally {
         if (!cancelled) setClubLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [route.club]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route.club, accessKey]);
 
   const club = clubs && route.club ? clubs.find((c) => c.id === route.club) : null;
   const isClubAdmin = !!auth && !!route.club && (auth.role === "master" || auth.club === route.club);
   const isMaster = !!auth && auth.role === "master";
+
+  // Players sign in to their club with its players' password (remembered on this
+  // device). The club's admin password and the master password work here too.
+  const doPlayerLogin = async (pw) => {
+    const asPlayer = { role: "player", club: route.club, password: pw };
+    if (await login(asPlayer)) { rememberPlayerAccess(route.club, asPlayer); return true; }
+    const asClub = { role: "club", club: route.club, password: pw };
+    if (await login(asClub)) { setAuth(asClub); return true; }
+    const asMaster = { role: "master", password: pw };
+    if (await login(asMaster)) { setAuth(asMaster); return true; }
+    return false;
+  };
 
   const doClubLogin = async (pw) => {
     const asClub = { role: "club", club: route.club, password: pw };
@@ -167,12 +239,12 @@ export default function App() {
       while (q.pending) {
         const value = q.pending;
         q.pending = null;
-        ok = await putKey(compKey(clubId, compId), JSON.stringify(value));
+        ok = await putKey(compKey(clubId, compId), JSON.stringify(value), accessFor(clubId));
       }
       q.running = false;
       setSaveError(ok ? "" : "Could not save — your last change may be lost. Check your connection.");
     },
-    [route.club]
+    [route.club, accessFor]
   );
 
   const saveConfig = async (cfg) => {
@@ -189,7 +261,7 @@ export default function App() {
   const newSeason = async () => {
     const blank = emptyComp();
     const results = await Promise.all(
-      clubData.config.comps.map((c) => putKey(compKey(route.club, c.id), JSON.stringify(blank)))
+      clubData.config.comps.map((c) => putKey(compKey(route.club, c.id), JSON.stringify(blank), auth))
     );
     setClubData((d) => {
       const comps = {};
@@ -212,6 +284,23 @@ export default function App() {
   };
 
   const setClubPasswordFor = (clubId, pw) => setPassword(auth, { role: "club", club: clubId }, pw);
+  const setPlayersPasswordFor = (clubId, pw) => setPassword(auth, { role: "players", club: clubId }, pw);
+
+  // A club admin is told whether the club has a players' password yet.
+  const isAdminHere = !!auth && !!route.club && (auth.role === "master" || auth.club === route.club);
+  useEffect(() => {
+    if (!isAdminHere) { setPlayersPasswordSet(null); return; }
+    let cancelled = false;
+    clubInfo(auth, route.club).then((r) => { if (!cancelled && r) setPlayersPasswordSet(!!r.playersPasswordSet); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdminHere, route.club]);
+
+  const changePlayersPassword = async (pw) => {
+    const ok = await setPlayersPasswordFor(route.club, pw);
+    if (ok) setPlayersPasswordSet(true);
+    return ok;
+  };
 
   const changeMasterPassword = async (pw) => {
     const ok = await setPassword(auth, { role: "master" }, pw);
@@ -251,6 +340,7 @@ export default function App() {
         clubs={clubs}
         onSaveClubs={saveClubs}
         onSetClubPassword={setClubPasswordFor}
+        onSetPlayersPassword={setPlayersPasswordFor}
         onChangeMasterPassword={changeMasterPassword}
       />
     ) : (
@@ -265,6 +355,16 @@ export default function App() {
           <button style={{ ...styles.btnPrimary, marginTop: 12 }} onClick={() => go("#/")}>See all clubs</button>
         </div>
       </div>
+    );
+  } else if (route.club && needPassword && !clubLoading) {
+    body = (
+      <LoginCard
+        title={`${club.name} — players' sign-in`}
+        hint="Enter your club's password to see its competitions and enter results. You'll only need to do this once on this device."
+        onSubmit={doPlayerLogin}
+        onCancel={() => go("#/")}
+        cancelLabel="Choose another club"
+      />
     );
   } else if (route.club && (clubLoading || !clubData || clubData.id !== route.club)) {
     body = <div style={styles.emptyState}>Loading {club.name}…</div>;
@@ -298,6 +398,8 @@ export default function App() {
               onSaveConfig={saveConfig}
               onNewSeason={newSeason}
               onChangePassword={changeClubPassword}
+              playersPasswordSet={playersPasswordSet}
+              onChangePlayersPassword={changePlayersPassword}
             />
           </div>
         )}

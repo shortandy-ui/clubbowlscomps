@@ -3,11 +3,12 @@ import { styles } from "./styles";
 import { MIN_COMPS, MAX_COMPS } from "./helpers";
 
 // Club admin tools: how many competitions, their names, new season, password.
-export default function ClubAdmin({ config, comps, onSaveConfig, onNewSeason, onChangePassword }) {
+export default function ClubAdmin({ config, comps, onSaveConfig, onNewSeason, onChangePassword, playersPasswordSet, onChangePlayersPassword }) {
   const [names, setNames] = useState(config.comps.map((c) => c.name));
   const [seasonText, setSeasonText] = useState("");
   const [showSeason, setShowSeason] = useState(false);
   const [newPw, setNewPw] = useState("");
+  const [playersPw, setPlayersPw] = useState("");
   const [msg, setMsg] = useState("");
 
   const count = names.length;
@@ -109,6 +110,35 @@ export default function ClubAdmin({ config, comps, onSaveConfig, onNewSeason, on
       </div>
 
       <div style={{ marginTop: 22, borderTop: "1px solid #d8cfb8", paddingTop: 16 }}>
+        <div style={styles.cardTitle}>Players' password</div>
+        {playersPasswordSet === false && (
+          <div style={styles.warnBox}>
+            This club has no players' password yet, so anyone with its link can see and change its competitions.
+            Set one below and give it to your members.
+          </div>
+        )}
+        <div style={{ ...styles.hintText, marginBottom: 8 }}>
+          Members type this once on their phone or computer to see this club's competitions and enter their results.
+          Players from other clubs can't get in without it.
+          {playersPasswordSet && " A players' password is set — entering a new one here replaces it (members will be asked for the new one)."}
+        </div>
+        <div style={{ display: "flex", gap: 8, maxWidth: 420, marginBottom: 22 }}>
+          <input style={styles.input} type="text" value={playersPw} onChange={(e) => setPlayersPw(e.target.value)}
+            placeholder={playersPasswordSet ? "New players' password" : "Players' password (4+ characters)"} autoComplete="off"
+            aria-label="Players' password" />
+          <button
+            style={styles.btnPrimary}
+            onClick={async () => {
+              if (playersPw.trim().length < 4) { alert("The players' password must be at least 4 characters."); return; }
+              const ok = await onChangePlayersPassword(playersPw.trim());
+              alert(ok ? "Players' password saved. Give it to your members." : "Could not save the players' password.");
+              if (ok) setPlayersPw("");
+            }}
+          >
+            {playersPasswordSet ? "Change" : "Set"}
+          </button>
+        </div>
+
         <div style={styles.cardTitle}>Change this club's admin password</div>
         <div style={{ display: "flex", gap: 8, maxWidth: 420 }}>
           <input style={styles.input} type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="New password (4+ characters)" />

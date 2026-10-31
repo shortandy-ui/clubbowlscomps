@@ -332,3 +332,7 @@ Object.assign(styles, {
   joinBox: { marginTop: 10, background: "#FDFBF6", border: "1px solid #E4CF8C", borderRadius: 6, padding: "8px 10px" },
   radioRow: { display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13, padding: "3px 0", cursor: "pointer" },
 });
+
+Object.assign(styles, {
+  warnBox: { background: "#FBF3DC", border: "1px solid #E4CF8C", borderRadius: 6, padding: "8px 10px", fontSize: 13, color: "#6b4f12", marginBottom: 8 },
+});
