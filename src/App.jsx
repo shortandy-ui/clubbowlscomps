@@ -389,6 +389,9 @@ export default function App() {
   } else if (route.view === "club") {
     body = (
       <>
+        <div style={styles.backBar}>
+          <button style={styles.backLink} onClick={() => go("#/")}>← All clubs</button>
+        </div>
         {isClubAdmin && (
           <div style={{ padding: "20px 16px 0" }}>
             <ClubAdmin
@@ -450,14 +453,19 @@ export default function App() {
       <style>{fontCss}</style>
       <header className="cc-grass" style={styles.header}>
         <div style={styles.headerInner}>
-          <button style={styles.logoBtn} onClick={() => go("#/")} aria-label="Home">
+          <button style={styles.logoBtn} onClick={() => go("#/")} aria-label="All clubs" title="All clubs">
             <Logo />
           </button>
           <div>
             <div style={styles.title}>Bowls Club Competitions</div>
             <div style={styles.subtitle}>{headerSubtitle}</div>
           </div>
-          {adminButton()}
+          <div style={styles.headerActions}>
+            {route.club && (
+              <button style={styles.changeClubBtn} onClick={() => go("#/")}>⇄ Change club</button>
+            )}
+            {adminButton()}
+          </div>
         </div>
       </header>
 

@@ -336,3 +336,14 @@ Object.assign(styles, {
 Object.assign(styles, {
   warnBox: { background: "#FBF3DC", border: "1px solid #E4CF8C", borderRadius: 6, padding: "8px 10px", fontSize: 13, color: "#6b4f12", marginBottom: 8 },
 });
+
+Object.assign(styles, {
+  headerActions: { marginLeft: "auto", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" },
+  changeClubBtn: {
+    background: "#D9B87A", color: "#17392A", border: "none", padding: "8px 14px", borderRadius: 6,
+    fontSize: 13, fontWeight: 700, cursor: "pointer",
+  },
+  backBar: { maxWidth: 1100, margin: "0 auto", padding: "14px 16px 0", boxSizing: "border-box" },
+});
+// the admin button now sits inside headerActions, so it no longer pushes itself right
+styles.adminToggle = { ...styles.adminToggle, marginLeft: 0 };
