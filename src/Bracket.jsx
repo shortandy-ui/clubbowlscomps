@@ -77,6 +77,7 @@ export default function Bracket({ rounds, roundMeta, isAdmin, onSubmitScore, onU
           <MatchCard
             key={matchIdx}
             match={match}
+            firstRound={roundIdx === 0}
             onSubmit={(s1, s2) => onSubmitScore(roundIdx, matchIdx, s1, s2)}
           />
         ))}
@@ -157,10 +158,11 @@ export default function Bracket({ rounds, roundMeta, isAdmin, onSubmitScore, onU
   );
 }
 
-function MatchCard({ match, onSubmit }) {
+function MatchCard({ match, onSubmit, firstRound = false }) {
   const [s1, setS1] = useState(match.score1 ?? "");
   const [s2, setS2] = useState(match.score2 ?? "");
-  const bye = (match.p1 && !match.p2) || (!match.p1 && match.p2);
+  // Only a first-round gap is a bye; later on it just means the opponent isn't known yet.
+  const bye = firstRound && ((match.p1 && !match.p2) || (!match.p1 && match.p2));
   const editable = match.p1 && match.p2 && !bye;
 
   useEffect(() => {
