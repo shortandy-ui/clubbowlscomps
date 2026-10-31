@@ -42,8 +42,10 @@ function hashPassword(password, salt) {
 }
 
 function pwKey(scope) {
-  return "pw__" + scope; // scope is "master" or "club__<id>"
+  return "pw__" + scope; // scope is "master", "club__<id>" (club admin) or "players__<id>"
 }
+
+const CLUB_ID = /^[a-z0-9-]{1,40}$/;
 
 async function setPassword(scope, password) {
   const salt = crypto.randomBytes(16).toString("hex");
@@ -72,20 +74,41 @@ async function checkPassword(scope, password) {
   return safeEqual(hashPassword(password, salt), hash);
 }
 
-// auth = { role: "master", password } or { role: "club", club, password }
+// auth = { role: "master", password }
+//      | { role: "club", club, password }     (that club's admin)
+//      | { role: "player", club, password }   (that club's players' password)
 async function verifyAuth(auth) {
   if (!auth || typeof auth !== "object") return null;
   if (auth.role === "master") {
     return (await checkPassword("master", auth.password)) ? { role: "master" } : null;
   }
-  if (auth.role === "club" && /^[a-z0-9-]{1,40}$/.test(auth.club || "")) {
+  if (auth.role === "club" && CLUB_ID.test(auth.club || "")) {
     return (await checkPassword("club__" + auth.club, auth.password))
       ? { role: "club", club: auth.club }
+      : null;
+  }
+  if (auth.role === "player" && CLUB_ID.test(auth.club || "")) {
+    return (await checkPassword("players__" + auth.club, auth.password))
+      ? { role: "player", club: auth.club }
       : null;
   }
   return null;
 }
 
+async function hasPlayersPassword(club) {
+  return (await readText(pwKey("players__" + club))) !== null;
+}
+
+// May this person see and enter results for this club? Its players, its admin
+// and the master admin can. A club with no players' password yet is open to
+// everyone (as before), until its admin sets one.
+async function canAccessClub(auth, club) {
+  if (!CLUB_ID.test(club || "")) return false;
+  const who = await verifyAuth(auth);
+  if (who && (who.role === "master" || who.club === club)) return true;
+  return !(await hasPlayersPassword(club));
+}
+
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-module.exports = { readText, writeText, setPassword, verifyAuth, wait };
+module.exports = { readText, writeText, setPassword, verifyAuth, canAccessClub, hasPlayersPassword, wait };
