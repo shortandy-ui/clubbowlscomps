@@ -1,12 +1,12 @@
 const { app } = require("@azure/functions");
-const { readText, writeText, verifyAuth, canAccessClub, wait } = require("../lib/store");
+const { readText, writeText, verifyAuth, canAccessClub, hasPlayersPassword, wait } = require("../lib/store");
 
 // Only these keys can be read or written through the public API.
 //   clubs                        the list of clubs            (master admin writes)
 //   club__<id>__config           a club's competitions setup  (club or master admin writes)
 //   club__<id>__c<n>             one competition's data       (the club's players write: they enter scores)
 // Everything under club__<id> can only be read or written by that club's
-// players, its admin or the master admin (once the club has a players' password).
+// players (with its players' password), its admin or the master admin.
 const KEY_OK = /^(clubs|club__[a-z0-9-]{1,40}__(config|c\d{1,3}))$/;
 const MAX_VALUE_LENGTH = 1000000;
 
@@ -22,7 +22,23 @@ function authFromHeader(request) {
   }
 }
 
-const NEED_PASSWORD = { status: 401, jsonBody: { error: "Enter your club's password.", needPassword: true } };
+// Club data must never be kept by a browser or a cache in between: whether a
+// request is allowed depends on the password sent with it.
+const NO_STORE = { "Cache-Control": "no-store, private", Pragma: "no-cache" };
+
+async function needPassword(club) {
+  await wait(300);
+  return {
+    status: 401,
+    headers: NO_STORE,
+    jsonBody: {
+      error: "Enter your club's password.",
+      needPassword: true,
+      // tells the app to say "ask your club admin" rather than offer a password box that can't work
+      playersPasswordSet: await hasPlayersPassword(club),
+    },
+  };
+}
 
 app.http("kv", {
   methods: ["GET", "POST"],
@@ -33,13 +49,13 @@ app.http("kv", {
       if (request.method === "GET") {
         const key = request.query.get("key") || "";
         if (!KEY_OK.test(key)) return { status: 400, jsonBody: { error: "bad key" } };
-        if (key !== "clubs" && !(await canAccessClub(authFromHeader(request), key.split("__")[1]))) {
-          await wait(300);
-          return NEED_PASSWORD;
+        const club = key.split("__")[1];
+        if (key !== "clubs" && !(await canAccessClub(authFromHeader(request), club))) {
+          return needPassword(club);
         }
         const value = await readText(key);
-        if (value === null) return { status: 404, jsonBody: { error: "not found" } };
-        return { status: 200, jsonBody: { key, value } };
+        if (value === null) return { status: 404, headers: NO_STORE, jsonBody: { error: "not found" } };
+        return { status: 200, headers: NO_STORE, jsonBody: { key, value } };
       }
 
       let body;
@@ -65,8 +81,7 @@ app.http("kv", {
         const allowed = who && (who.role === "master" || (who.role === "club" && who.club === clubId));
         if (!allowed) return { status: 401, jsonBody: { error: "club admin only" } };
       } else if (!(await canAccessClub(auth, key.split("__")[1]))) {
-        await wait(300);
-        return NEED_PASSWORD;
+        return needPassword(key.split("__")[1]);
       }
 
       await writeText(key, value);
