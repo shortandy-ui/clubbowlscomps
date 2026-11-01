@@ -113,8 +113,8 @@ export default function ClubAdmin({ config, comps, onSaveConfig, onNewSeason, on
         <div style={styles.cardTitle}>Players' password</div>
         {playersPasswordSet === false && (
           <div style={styles.warnBox}>
-            This club has no players' password yet, so anyone with its link can see and change its competitions.
-            Set one below and give it to your members.
+            This club has no players' password yet, so your members can't see its competitions.
+            Set one below and give it to them.
           </div>
         )}
         <div style={{ ...styles.hintText, marginBottom: 8 }}>

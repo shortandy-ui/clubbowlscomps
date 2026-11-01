@@ -103,6 +103,8 @@ export default function App() {
   // { [clubId]: { role: "player", club, password } } — see readPlayerAccess
   const [playerAccess, setPlayerAccess] = useState(readPlayerAccess);
   const [needPassword, setNeedPassword] = useState(false);
+  // the club hasn't set a players' password yet, so only its admin can get in
+  const [clubClosed, setClubClosed] = useState(false);
   const [playersPasswordSet, setPlayersPasswordSet] = useState(null);
 
   useEffect(() => {
@@ -180,6 +182,7 @@ export default function App() {
         if (e.needPassword) {
           setClubData(null);
           setNeedPassword(true);
+          setClubClosed(e.playersPasswordSet === false);
           // A remembered password that no longer works (the admin changed it) is forgotten.
           if (access && access.role === "player") forgetPlayerAccess(route.club);
         } else {
@@ -358,10 +361,20 @@ export default function App() {
       </div>
     );
   } else if (route.club && needPassword && !clubLoading) {
-    body = (
+    body = clubClosed ? (
       <LoginCard
+        key={route.club + ":closed"}
+        title={`${club.name} isn't open to players yet`}
+        hint="The club's competitions admin needs to set a players' password first. If you're the admin, sign in here with the club's admin password."
+        onSubmit={doPlayerLogin}
+        onCancel={() => go("#/")}
+        cancelLabel="Choose another club"
+      />
+    ) : (
+      <LoginCard
+        key={route.club}
         title={`${club.name} — players' sign-in`}
-        hint="Enter your club's password to see its competitions and enter results. You'll only need to do this once on this device."
+        hint="Enter your club's players' password to see its competitions and enter results. You'll only need to do this once on this device."
         onSubmit={doPlayerLogin}
         onCancel={() => go("#/")}
         cancelLabel="Choose another club"
@@ -392,6 +405,14 @@ export default function App() {
       <>
         <div style={styles.backBar}>
           <button style={styles.backLink} onClick={() => go("#/")}>← All clubs</button>
+          {access && access.role === "player" && (
+            <button
+              style={{ ...styles.backLink, float: "right", color: "#8a6a1f" }}
+              onClick={() => { forgetPlayerAccess(route.club); go("#/"); }}
+            >
+              Sign out of this club on this device
+            </button>
+          )}
         </div>
         {isClubAdmin && (
           <div style={{ padding: "20px 16px 0" }}>
@@ -440,7 +461,11 @@ export default function App() {
             {clubs.map((c) => (
               <button key={c.id} className="cc-tcard" style={styles.tCard} onClick={() => go(`#/c/${c.id}`)}>
                 <div style={styles.tCardName}>{c.name}</div>
-                <div style={styles.tCardMeta}>View competitions →</div>
+                <div style={styles.tCardMeta}>
+                  {accessFor(c.id)
+                    ? accessFor(c.id).role === "player" ? "✓ Signed in on this device" : "✓ Signed in as admin"
+                    : "🔒 Password needed"}
+                </div>
               </button>
             ))}
           </main>

@@ -10,11 +10,14 @@ function authHeader(auth) {
 // Throws if the server can't be reached; the error has needPassword = true
 // when the club's players' password is needed (or the one given is wrong).
 export async function getKey(key, auth) {
-  const res = await fetch(`/api/kv?key=${encodeURIComponent(key)}`, { headers: authHeader(auth) });
+  // no-store: never reuse an earlier answer — whether it's allowed depends on the password sent
+  const res = await fetch(`/api/kv?key=${encodeURIComponent(key)}`, { headers: authHeader(auth), cache: "no-store" });
   if (res.status === 404) return null;
   if (res.status === 401) {
+    const body = await res.json().catch(() => ({}));
     const err = new Error("Enter your club's password.");
     err.needPassword = true;
+    err.playersPasswordSet = body.playersPasswordSet !== false;
     throw err;
   }
   if (!res.ok) throw new Error(`Could not load data (${res.status})`);
