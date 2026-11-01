@@ -64,7 +64,7 @@ export function generateBracket(entrants) {
     });
   }
 
-  const roundMeta = rounds.map(() => ({ playBy: "", contact: "" }));
+  const roundMeta = rounds.map(() => ({ contactBy: "", playBy: "" }));
   return { rounds, roundMeta };
 }
 
