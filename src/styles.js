@@ -347,3 +347,10 @@ Object.assign(styles, {
 });
 // the admin button now sits inside headerActions, so it no longer pushes itself right
 styles.adminToggle = { ...styles.adminToggle, marginLeft: 0 };
+
+Object.assign(styles, {
+  signOutBtn: {
+    background: "transparent", color: "#FFFDF7", border: "2px solid #FFFDF7", padding: "7px 13px", borderRadius: 6,
+    fontSize: 13, fontWeight: 700, cursor: "pointer",
+  },
+});

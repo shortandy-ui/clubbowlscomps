@@ -405,14 +405,7 @@ export default function App() {
       <>
         <div style={styles.backBar}>
           <button style={styles.backLink} onClick={() => go("#/")}>← All clubs</button>
-          {access && access.role === "player" && (
-            <button
-              style={{ ...styles.backLink, float: "right", color: "#8a6a1f" }}
-              onClick={() => { forgetPlayerAccess(route.club); go("#/"); }}
-            >
-              Sign out of this club on this device
-            </button>
-          )}
+
         </div>
         {isClubAdmin && (
           <div style={{ padding: "20px 16px 0" }}>
@@ -489,6 +482,19 @@ export default function App() {
           <div style={styles.headerActions}>
             {route.club && (
               <button style={styles.changeClubBtn} onClick={() => go("#/")}>⇄ Change club</button>
+            )}
+            {route.club && access && access.role === "player" && (
+              <button
+                style={styles.signOutBtn}
+                title="Sign out of this club on this device — the password will be asked for next time"
+                onClick={() => {
+                  if (!window.confirm(`Sign out of ${club ? club.name : "this club"} on this device? You'll need the club's password to get back in.`)) return;
+                  forgetPlayerAccess(route.club);
+                  go("#/");
+                }}
+              >
+                ✕ Sign out
+              </button>
             )}
             {adminButton()}
           </div>
