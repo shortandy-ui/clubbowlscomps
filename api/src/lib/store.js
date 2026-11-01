@@ -100,14 +100,13 @@ async function hasPlayersPassword(club) {
   return (await readText(pwKey("players__" + club))) !== null;
 }
 
-// May this person see and enter results for this club? Its players, its admin
-// and the master admin can. A club with no players' password yet is open to
-// everyone (as before), until its admin sets one.
+// May this person see and enter results for this club? Only its players (with
+// the club's players' password), its admin and the master admin. A club with no
+// players' password yet is closed to players until its admin sets one.
 async function canAccessClub(auth, club) {
   if (!CLUB_ID.test(club || "")) return false;
   const who = await verifyAuth(auth);
-  if (who && (who.role === "master" || who.club === club)) return true;
-  return !(await hasPlayersPassword(club));
+  return !!who && (who.role === "master" || who.club === club);
 }
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
