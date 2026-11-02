@@ -31,8 +31,35 @@ function niceDate(iso) {
 }
 
 // A round's "Contact by" and "Play by" dates: date boxes for the admin, plain text for everyone else.
-function renderRoundDates(meta, roundIdx, isAdmin, onUpdateMeta, extraStyle) {
+// The Final has just one date: the day it is played (kept as its play-by date).
+function renderRoundDates(meta, roundIdx, isAdmin, onUpdateMeta, extraStyle, isFinal = false) {
   const m = meta || {};
+  if (isFinal) {
+    if (isAdmin) {
+      return (
+        <div style={{ ...styles.roundDates, ...extraStyle }}>
+          <label style={styles.dateLabel}>
+            Final date
+            <input
+              type="date"
+              style={styles.dateInput}
+              value={m.playBy || ""}
+              onChange={(e) => onUpdateMeta(roundIdx, "playBy", e.target.value)}
+            />
+          </label>
+        </div>
+      );
+    }
+    return (
+      <div style={{ ...styles.roundDates, ...extraStyle }}>
+        {m.playBy && (
+          <div style={styles.dateReadout}>
+            Final: <b>{niceDate(m.playBy)}</b>
+          </div>
+        )}
+      </div>
+    );
+  }
   if (isAdmin) {
     return (
       <div style={{ ...styles.roundDates, ...extraStyle }}>
@@ -134,7 +161,7 @@ function PhoneBracket({ rounds, roundMeta, isAdmin, onSubmitScore, onUpdateMeta 
         ))}
       </div>
       <div style={styles.roundLabel}>{roundName(ri, total)}</div>
-      {renderRoundDates(roundMeta[ri], ri, isAdmin, onUpdateMeta, { marginBottom: 12 })}
+      {renderRoundDates(roundMeta[ri], ri, isAdmin, onUpdateMeta, { marginBottom: 12 }, ri === total - 1)}
       <div style={styles.phoneList}>
         {games.length ? (
           games.map(({ m, i }) => (
@@ -202,7 +229,7 @@ export default function Bracket({ rounds, roundMeta, isAdmin, onSubmitScore, onU
         <div style={{ ...styles.bracketRow, justifyContent: "center" }}>
           <div style={styles.roundCol}>
             <div style={styles.roundLabel}>Final</div>
-            {renderRoundDates(roundMeta[0], 0, isAdmin, onUpdateMeta, { marginBottom: 8 })}
+            {renderRoundDates(roundMeta[0], 0, isAdmin, onUpdateMeta, { marginBottom: 8 }, true)}
             <MatchCard match={finalMatch} onSubmit={(s1, s2) => onSubmitScore(0, 0, s1, s2)} />
             <div style={styles.champBox}>
               {finalMatch.winner ? <>🏆 {finalMatch.winner}</> : "TBD"}
@@ -219,7 +246,7 @@ export default function Bracket({ rounds, roundMeta, isAdmin, onSubmitScore, onU
         {leftCols.map((c) => renderRound(c.roundIdx, c.items, true, "l"))}
         <div className="cc-final-col" style={styles.finalCol}>
           <div style={styles.roundLabel}>Final</div>
-          {renderRoundDates(roundMeta[totalRounds - 1], totalRounds - 1, isAdmin, onUpdateMeta, { marginBottom: 8 })}
+          {renderRoundDates(roundMeta[totalRounds - 1], totalRounds - 1, isAdmin, onUpdateMeta, { marginBottom: 8 }, true)}
           <MatchCard
             match={finalMatch}
             onSubmit={(s1, s2) => onSubmitScore(totalRounds - 1, 0, s1, s2)}
